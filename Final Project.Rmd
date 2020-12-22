@@ -1,0 +1,247 @@
+---
+title: |
+  | \vspace{7cm} \LARGE{Analyzing the differences of the 2019 Canadian Federal Election If Everyone Had Voted}
+author: "Zijun Ye (1005414507)"
+date: "21/12/2020"
+output: pdf_document
+---
+
+```{r,warning=FALSE, echo=FALSE, message=FALSE}
+library(tidyverse)
+election <- read.csv("election.csv")
+```
+\newpage
+
+GitHub Link: https://github.com/Chuckyip/STA304-Final-Project
+
+# Abstract
+In this report, two datasets (CES & GSS) were used to analyze the differences if everyone has voted in the 2019 Canadian Election. The method used is logistic regression model and post-stratification. Canadian citizens that have different demographical characteristics such as sex, household income, the importance of religious belief, education, mother tongue, province of living, etc. would have different intentions of voting. It was found that the estimated percentage of votes for the Conservative Party was lower than the actual result. 
+
+# Keywords
+Logistic Regression Model, Post-stratification, 2019 Canadian Election, Percentage votes for the Conservative Party
+
+
+# Introduction
+
+The 2019 Canadian federal election was held on October 21, 2019. The Liberal Party led by the incumbent Prime Minister Justin Trudeau has won this election. For all the Canadian citizens who are eligible and register to vote, there is approximately 67 percent effectively participating in voting [1].
+  
+  
+This report summarizes the statistical model and analysis results associated with the differences of that if everyone who is a registered voter takes part in this election. The purpose of this report is to investigate what the most important difference comparing to the actual result is. The main reasons that influence their intention to vote and would cause such differences such as citizens in different regions, their household condition, etc. are all important points needed to be taking into consideration. 
+	
+	
+In this report, the model is built using the general linear regression and post-stratification (MRP) method to estimate the percentage of votes for the Conservative Party base on the 2019 Canadian Election Study (CES) Data available on the ces-eec.ca website [2] and the 2017 General Social Survey: Families Cycle 31 (GSS) Data provided by Statistics Canada [3]. The model selected and dataset used is specified in detail in the next several sections
+
+# Methodology
+
+## Data
+
+This report uses two main datasets, the first one is the 2019 Canadian Election Study (CES) Data which are used for building the general linear regression model to estimate whether a Canadian citizen is willing to vote for the Conservative party. This CES Data contains 620 variables and 37822 pre-election survey interviews. The second one is the 2017 General Social Survey: Families Cycle 31 (GSS) Data which the observations would be regrouping into cells that have the same demographical characteristics and experience the post-stratified process to estimate the final percentage of votes for the Conservative Party. The cleaning up process of the GSS Data was based on the R codes provided by STA304 Professor Rohan Alexander and it contains 461 variables and 20602 observations.
+
+Initially, the variables selection are based on finding the common variables in both CES and GSS dataset. Those variables that could reflect the living condition and the basic demographic information of the citizens are primarily been selected. After selecting and cleaning up the variables, which includes the uniform process of modifying the variables' names and values for both datasets. Removing those observations who are not Canadian citizens. Most of the variables’ categories have been reduced and variables are all transformed into either binary or categorical which would make further interpretation of the model coefficients easier and make each partitioning featured demographic cell of people more clear. The following Table 1&2 shows all the information with the selected reformatted variables and there are 13 variables including one outcome response variable “vote_conservative”, 6 binary variables, and 6 categorical variables. All the variables in table 1&2 would be used for the next step of modeling.
+
+```{r, warning=FALSE, echo=FALSE}
+Variables <- c("vote_conservative","sex","religion_importance","employment","have_children","born_canada","household_size", "province","household_income","age_group","marital","education","mothertongue")
+
+Description<- c("Whether a citizen would vote for the Conservative Party",
+                "is measured as either male or female",
+                "How religion is important for a citizen",
+                "Whether a citizen is employed",
+                "Whether a citizen have at least a child",
+                "Whether a citizen was born in Canada",
+                "How many people are living together in a household",
+                "Which province is a citizen currently living in",
+                "How much household income made in a year",
+                "The age of a citizen in 2019",
+                "The martial status of a citizen",
+                "The educational level of a citizen",
+                "The mother tongue of a citizen (can be more then one language)")
+
+Type<- c("Binary","Binary","Categorical","Binary","Binary","Binary","Categorical","Categorical","Categorical","Categorical","Binary","Binary","Categorical")
+
+Number_of_Categories <- c(2,2,4,2,2,2,4,13,6,4,2,2,4)
+
+Values <- c("1 (vote for the Conservative),0 (vote for the others party)", 
+            "Female, Male",
+            "Not at all important, Not very important, Somewhat important, Very important",
+            "Employed, Unemployed",
+            "Yes, No",
+            "Yes, No",
+            "One person household, Two person household, Three person household, Four or more person household",
+            "Alberta, British Columbia, Manitoba etc. (All the provinces in Canada)",
+            "Less than $25,000, $25,000 to $49,999, $50,000 to $74,999, $75,000 to $99,999, $100,000 to $ 124,999, $125,000 and more",
+            "18-30, 30-55, 55-70, Above 70",
+            "Married, Not Married",
+            "Less than highschool diploma or equivalent, More than highschool diploma",
+            "English, French, Multiple, Others")
+
+knitr::kable(tibble(Variables,Description, Type), caption = "Original Variables Information")
+knitr::kable(tibble(Variables,Number_of_Categories,Values),align=c('l','r','c'), caption = "Original Variables Information (continuous)")
+```
+
+
+## Model
+
+The method of the General Linear Model (GLM) would be used to analyze the CES dataset. The logistic regression is chosen since the outcome variable is whether a citizen would vote for the Conservative Party. The assumption of this model which the predictors must be independent of each other. In order to satisfy the assumption of the GLM model, removing the variables that would have collinearity with others. The mathematic notation of the original model can be express as,
+
+$$log(\frac{P}{1-P}) = \beta_0 + \beta_1 sex + \beta_2 religion\_importance $$
+$$+ \beta_3 employment + \beta_4 have\_children + \beta_5 born\_canada $$
+$$+ \beta_6 household\_size + \beta_7 province + \beta_8 household\_income $$
+$$+ \beta_9 age\_group + \beta_{10} marital + \beta_{11} education + \beta_{12} mothertongue$$
+$$ \text{Model 1. Original Full Model}$$
+
+where $P$ indicate the probability of a Canadian citizen would vote for the Conservative Party. The coefficients $\beta_0$ is the intercept term and other $\beta_i$’s are the estimated coefficient of each predictor in the model. 
+
+The next step is using the variance inflation factor (VIF) to detect the magnitude of multicollinearity. If the magnitude of VIF is 1 means that there is no correlation between a predictor and the remaining predictor variables. The general rule of thumb is that VIFs exceeding 4 warrant further investigation.
+
+The further variable selection from these 12 predictors involves the stepwise selection method by Bayesian Information Criterion (BIC). Since there are $2^{12}$ possible models, the basic idea for such a method is to iteratively remove the non-important predictors or add useful predictors from the full model according to some criterion and choose the best model. The model after being stepwise BIC selection will become the final model.
+
+The model’s estimated coefficients are required to be exponential which could be interpreted as the odds ratio of the interest, and the 95% confidence intervals are used to assess the significance of the estimates. The AUC-ROC curve would also be introduced to check the final model’s goodness of fit. This curve tells how much a model is capable of distinguishing between classes. The higher the AUC, the better the model is at predicting the true value. All of the variables, model selection, and model diagnostic would be done by the software programming language R.
+
+## Post-stratification
+
+After successfully building the model, the GSS dataset would be used as the census data and the observation would be partitioned into different demographic cells (stratum) according to the values of each model predictors. Then the estimation of the response variable would be done by using the logistic regression model and be calculated according to each cell’s estimation and weights. The next thing is to aggregate the cell-level estimates up to a population-level estimate by weighting each cell by its relative proportion in the population. The formula for the post-stratification calculation can be expressed as:
+
+$$\hat{y}^{PS}= \frac{\sum{N_j\hat{y}_j}}{\sum{N_j}}$$
+where $\hat{y_j}$ is the estimate in each cell and $N_j$ is the population size of the $j^{th}$ cell based off demographics. $\hat{y}^{PS}$ indicates the post-stratification prediction over the total population.
+
+# Results
+
+As mention above, the information of result coefficient summary of the original full model shown in the appendix (1) have encountered the “NA” issue of the predictor “household_size”, which describes the number of people living together in a household, the likely reason might be that there exists another predictor which have a correlation with the “household_size”. After several trials by removing different predictors, it was finally found that there is the correlation between “religion_important” and “household_size”, so only one is kept in the model between them for doing the next steps of analysis. The predictor “religion_important” remains since the religious belief is important for a person to vote. Therefore the second version of the full model can be shown as:
+
+$$log(\frac{P}{1-P}) = \beta_0 + \beta_1 sex + \beta_2 religion\_importance $$
+$$+ \beta_3 employment + \beta_4 have\_children + \beta_5 born\_canada $$
+$$+ \beta_6 province + \beta_7 household\_income + \beta_8 age\_group$$
+$$ + \beta_{9} marital + \beta_{10} education + \beta_{11} mothertongue$$
+$$ \text{Model 2. Original Full Model 2}$$
+The VIF in Table 4 in the appendix (2) shows that all the values are under 4 which indicates there is no multicollinearity between predictors in Model 2. Among all predictors of Model 2 in the coefficients summary in the appendix (3), only some of them are significant regression coefficients. Therefore, applying the stepwise selection method is necessary to determine which of them has a significant effect on prediction. After evaluation on the stepwise BIC method, it provides a simpler with fewer predictors and each has significant regression coefficients. This BIC model is chosen to be the final model in which the model expression and the odds ratio coefficient summary table are demonstrated below, 
+
+$$log(\frac{P}{1-P}) = \beta_0 + \beta_1 sex + \beta_2 religion\_importance $$
+$$+ \beta_3 have\_children + \beta_4 province + \beta_5 household\_income$$
+$$ + \beta_{6} marital + \beta_{7} education + \beta_{8} mothertongue$$
+$$\text{Model 3. Final Model}$$
+
+```{r, warning=FALSE, echo=FALSE}
+# Build the final model
+final_logit <- glm(vote_conservative ~ sex + religion_importance + have_children + 
+    province + household_income + marital + education + mothertongue, family = binomial, data = election)
+cimat = Pmisc::ciMat(0.95)
+coef_table = summary(final_logit)$coef[, rownames(cimat)] %*% cimat
+knitr::kable(exp(coef_table), digits=4,
+             caption="Odds Ratio and 95% Confidence Interval of the Coefficients")
+```
+
+As shown in Model 3 above, the remained 8 predictors are “sex, religion_importance, have_children, province, household_income, marital, education, and mothertongue”. This model is telling us these predictors have the most influence on the intention of people to vote for the 2019 election. Table 3 indicates the natural scale of the odds ratio estimated coefficients of each predictor and their lower and upper bound of the 95% confidence intervals. If the confidence interval does not contain 1, it indicates this predictor is significant. The following figure of the ROC curve shows that the area under the curve (AUC) is 70% which means that this logistic regression can distinguish whether a Canadian citizen would vote for the Conservative Party 70 percent of the time.
+
+```{r, warning=FALSE, echo=FALSE,message=FALSE}
+library(pROC)
+p <- predict(final_logit,  type="response")
+roc_logit <- roc(election$vote_conservative ~ p)
+TPR <- roc_logit$sensitivities
+FPR <- 1 - roc_logit$specificities
+plot(FPR, TPR, xlim = c(0,1), ylim = c(0,1), type = 'l', lty = 1, lwd = 2,col = 'red', bty = "n", main="Figure 1. ROC curve")
+abline(a = 0, b = 1, lty = 2, col = 'blue')
+text(0.7,0.4,label = paste("AUC = ", round(auc(roc_logit),2)))
+```
+
+Before starting the post-stratification, the census data would suppose to be partitioning into 19969 cells. However, there are only 10 provinces in the census data and more than half cells do not contain any observations. Therefore, only 5516 cells have formed at the end. It’s worth noting that there is one cell involving, which contains the most numbers of observations, 61 observations, and their characteristics are: female, having a very important religious belief, having no child, living in Ontario, having yearly household income at the level of \$25,000 to \$49,999, married, having high school or less educational level and English native speaker.
+
+Then, the final model that estimating the Conservative Party support would be used in each cell to calculate the estimated probability to vote for the Conservative Party. According to the post-stratification formula, the result of estimation of that the proportion of voters in favor of voting for the Conservative Party to be 0.2762. This is based on our post-stratification analysis of the proportion of voters in favor of the Conservative Party modeled by a logistic regression model, which accounted for the 8 variables “sex, religion_importance, have_children, province, household_income, marital, education, and mothertongue”.
+
+# Discussion
+
+The following analysis is about the final model mention in the last section with 4 categorical variables and 4 binary variables. The interpretation of these estimated coefficients in the natural scale of predictors would be, in general, the odds ratio between this citizen in this specific predictor group and a citizen that in the reference group, controlling other predictors have the reference group value. For example, “sexMale” which refers to a male citizen have an estimated value of 1.6093, which means that the odds ratio of voting for the Conservative Party between a male citizen and a female citizen is 1.6093, which can be interpreted as a male would be more likely to vote for the Conservative Party than a female, controlling other characteristics be the same. Also, the 95% confidence interval of “sexMale” does not include the value of 1, which indicates this predictor is significant for the model. For the predictor “religion_importance”, we can see that as the religious belief of a citizen becoming more important, the probability of voting for the Conservative Party becomes higher. One more interesting finding is that the majority of the provinces such as Alberta, Manitoba, British Columbia, Saskatchewan, etc. have voted for the Conservative Party according to the data provided by the Statista [4]. From our model coefficient table, we can notice that the predictor “province” has Alberta as the reference group, and no other provinces would have a higher odds ratio comparing to it. Whereas, Manitoba, British Columbia, Saskatchewan, etc. have an odds ratio nearly closed to 1 comparing to Alberta, which means people who live in these provinces would also have more intention to vote for the Conservative Party as expected. There are more interesting findings that can be discovered from this table.
+
+
+The sample data is drawn from the 2019 Canadian Election Study (CES) Data provided by the ces-eec.ca website. The census data is drawn from the 2017 General Social Survey: Families Cycle 31 (GSS) Data provided by Statistics Canada. There are originally 12 predictor variables selected in both datasets, and the stepwise BIC method is used to select the best simple logistic models for predicting the probability of voting for the Conservative Party in this election. Eventually, the actual percentage of votes for the Conservative Party in the 2019 Canadian Election was 33.34% according to the data provided by Elections Canada [1]. The census data are partitioned into corresponding cells according to the 8 predictors models and post-stratification analyses are performed and have the result that if everyone votes in this election, the estimated percentage that votes for the Conservative Party is 27.62% which is lower than the actual one. However, although this research has utilized recent survey data and census data, there might exist some potential weaknesses problem during the entire analysis. The following subsection will discuss the weaknesses and raise some notices for further research.
+
+## Weakness
+
+First of all, the 2019 Canadian Election Study (CES) Data contains two main parts of the survey, the Campaign Period Survey (CPS) and the Post-Election Survey (PES). All the variables selected for the model are from the CPS part since there are too many missing values in the PES part. The most important variable, vote choice from the CPS part, is lack of reliability because what people actually vote after the CPS might be different from what they have answered. Also, the number of common variables in both CES Data and GSS Data are quite a few, the answer bank for both data may not share the exact information as well. Therefore, there exists much bias when doing the cleanup process. Besides, the GSS was done in 2017, Although the variable ‘age’ has been increased by 2 to accommodate the CES, it is not practical to modify other variables that would potentially influence the accuracy of the predictions. The GSS Data as the census contains a small number of samples that could not represent the population at all. There is no sample coming from Northwest Territories, Nunavut, and Yukon provinces. The problem of less amount of samples would also cause absent cells in the post-stratification step, the census data only establish 5516 out of 19969 cells.
+
+The model has some weaknesses either. The model used in this report is the logistic regression by considering all variables as a fixed effect. However, some variables would be varied as the time elapsing, those variables usually would be treated as the random effect which has their own distribution. Thus, if holding every predictor constant, the change in probability of the outcome variable over different values of the predictor of interest is only true when all other predictors are held constant or in the same group which is quite narrowing. In other words, the ordinary logistic regression could not cover more variance than the mixed-effect regression model. Last but not least, we only estimate the percentage votes for the Conservative Party which as a result is lower than the actual percentage votes. However, we don’t have enough evidence to show that such a difference in the percentage change would change the result of which party would win the election if everyone has voted.
+
+# Next Steps
+
+After discussing the weaknesses, any subsequent work should be considered, which may help further research to be more successful. As mentioned before, the PES part of the CES should be completed since people would have different thoughts when the election is holding and after the election was held. The PES data would be more reliable for improving the accuracy of the model prediction. The GSS should be held every year and such a survey should cover as many people as it can to make it more representative of the entire population. Also, the method of these surveys could be improved such as avoiding imperfect sampling population and non-response problems. The survey organization should increase the volume of the survey in some efficient way such as introducing various ways for collection and launch some incentive policies to gain more attention for the survey. Moreover, both dataset contains more useful and significant variables, but this report only analyzes some of them due to technical and time constraints. Therefore, more variables should be used to build a more effective and more practical model with mixed effects that can control more of the unpredictable variances. Moreover, other major parties should also be modeled and check the difference that if everyone has voted to compare to the actual result. 
+
+# Reference
+
+[1] Elections Canada. (2019). FORTY-THIRD GENERAL ELECTION 2019 Official Voting Results. https://www.elections.ca/res/rep/off/ovr2019app/home.html#3. 
+
+[2] Stephenson, Laura B; Harell, Allison; Rubenson, Daniel; Loewen, Peter John, 2020, "2019 Canadian Election Study - Online Survey", https://doi.org/10.7910/DVN/DUS88V, Harvard Dataverse, V1
+
+[3] General social survey on Family (cycle 31), 2017 Retrieved Dec 01,2020 from: http://dc.chass.utoronto.ca
+
+[4] Statista. (2019). “Preliminary share of total votes for each party in the Canadian federal election held on October 21, 2019 (as of October 22, 2019), by province*”. Retrieved Dec 19, 2020 from https://www.statista.com/statistics/1062264/canada-election-share-of-popular-vote-per-party-by-province/.
+
+\newpage
+
+# Appendix
+
+
+(1) R Summary of the Original Model
+```{r,warning=FALSE, echo=FALSE}
+# Build logistic regression model estimating the votes for the Liberal Party
+logit <- glm(vote_conservative ~ age_group + sex + religion_importance + employment + have_children + born_canada +  province +household_income + marital + education + mothertongue + household_size,
+                     data = election, 
+                     family=binomial)
+
+summary(logit)
+```
+
+
+```{r,warning=FALSE, echo=FALSE, message=FALSE}
+# collinearity between religion_importance and household_size (remove one) and build a new model
+logit1 <- glm(vote_conservative ~ age_group + sex + religion_importance + employment + have_children + born_canada +  province +household_income + marital + education + mothertongue,
+                     data = election, 
+                     family=binomial)
+# summary(logit1)
+```
+(2) VIF Table
+```{r,warning=FALSE, echo=FALSE, message=FALSE}
+# VIF, check collinearity between predictors
+library(car)
+knitr::kable(vif(logit1)[,1],digits = 4,col.names = "VIF", caption = "Variance Inflation Factor")
+```
+
+
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE,results=FALSE}
+# model selection
+library(MASS)
+# Using step BIC regression to reduce predictors
+step_BIC_trump <- logit1 %>% stepAIC(k=log(nrow(election)))
+```
+
+(3) Model 2 Coefficients Table
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+# Build the final model
+final_logit <- glm(vote_conservative ~ sex + religion_importance + have_children + 
+    province + household_income + marital + education + mothertongue, family = binomial, data = election)
+
+knitr::kable(summary(logit1)$coef, caption = "Model 2 Coefficients Table")
+cimat = Pmisc::ciMat(0.95)
+
+#knitr::kable(summary(final_logit)$coef, caption = "Final Model Coefficients Table")
+#cimat = Pmisc::ciMat(0.95)
+#coef_table = summary(final_logit)$coef[, rownames(cimat)] %*% cimat
+#knitr::kable(exp(coef_table), digits=4,
+#             caption="Odds Ratio and 95% Confidence Interval of the Coefficients")
+```
+
+
+
+(4) Estimated Percentage of Votes for the Conservative Party
+```{r,warning=FALSE, echo=FALSE, message=FALSE}
+# Post-Stratification
+final_gss <- read.csv("final_gss.csv")
+
+
+final_gss$estimate <- final_logit %>% predict(newdata = final_gss, type="response")
+
+final_gss <- final_gss %>% 
+  mutate(alp_predict_prop = estimate*n) 
+conservative_prediction <- final_gss %>% summarise(alp_predict = sum(alp_predict_prop) / sum(n))
+knitr::kable(conservative_prediction,digits=4)
+```
+
