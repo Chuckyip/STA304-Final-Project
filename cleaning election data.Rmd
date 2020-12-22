@@ -1,0 +1,189 @@
+---
+title: "Election data"
+author: "Zijun Ye"
+date: "05/12/2020"
+output: pdf_document
+---
+
+```{r, warning=FALSE}
+library(haven)
+library(tidyverse)
+setwd("/Users/chuckyip/Desktop/FinalProject")
+# Read in the raw data
+raw_data <- read_dta("2019 Canadian Election Study - Online Survey v1.0.dta")
+```
+
+```{r}
+# Pull out a bunch of variables
+election <- raw_data %>% 
+  select(cps19_gender,
+         cps19_rel_imp,
+         cps19_employment,
+         cps19_children,
+         cps19_citizenship,
+         cps19_bornin_canada,
+         cps19_household,
+         cps19_province,
+         cps19_income_cat,
+         cps19_income_number,
+         cps19_language_68,
+         cps19_language_69,
+         cps19_language_70,
+         cps19_language_71,
+         cps19_language_72,
+         cps19_language_73,
+         cps19_language_74,
+         cps19_language_75,
+         cps19_language_76,
+         cps19_language_77,
+         cps19_language_78,
+         cps19_language_79,
+         cps19_language_80,
+         cps19_language_81,
+         cps19_language_82,
+         cps19_language_83,
+         cps19_language_84,
+         cps19_language_85,
+         cps19_age,
+         cps19_marital,
+         cps19_education,
+         cps19_votechoice,
+         cps19_vote_unlikely) %>% 
+  filter(cps19_citizenship != 5) # remove permanent residents
+```
+
+```{r}
+# remove NA
+election$cps19_language_68[is.na(election$cps19_language_68)] <- 0
+election$cps19_language_69[is.na(election$cps19_language_69)] <- 0
+election$cps19_language_70[is.na(election$cps19_language_70)] <- 0
+election$cps19_language_71[is.na(election$cps19_language_71)] <- 0
+election$cps19_language_72[is.na(election$cps19_language_72)] <- 0
+election$cps19_language_73[is.na(election$cps19_language_73)] <- 0
+election$cps19_language_74[is.na(election$cps19_language_74)] <- 0
+election$cps19_language_75[is.na(election$cps19_language_75)] <- 0
+election$cps19_language_76[is.na(election$cps19_language_76)] <- 0
+election$cps19_language_77[is.na(election$cps19_language_77)] <- 0
+election$cps19_language_78[is.na(election$cps19_language_78)] <- 0
+election$cps19_language_79[is.na(election$cps19_language_79)] <- 0
+election$cps19_language_80[is.na(election$cps19_language_80)] <- 0
+election$cps19_language_81[is.na(election$cps19_language_81)] <- 0
+election$cps19_language_82[is.na(election$cps19_language_82)] <- 0
+election$cps19_language_83[is.na(election$cps19_language_83)] <- 0
+election$cps19_language_84[is.na(election$cps19_language_84)] <- 0
+
+election$cps19_votechoice[is.na(election$cps19_votechoice)] <- 0
+election$cps19_vote_unlikely[is.na(election$cps19_vote_unlikely)] <- 0
+
+# redefine language and votechoice
+election <- election %>%
+   mutate(num_language = cps19_language_68 + cps19_language_69 + cps19_language_70 +
+           cps19_language_71 + cps19_language_72 + cps19_language_73 + cps19_language_74 +
+           cps19_language_75 + cps19_language_76 + cps19_language_77 + cps19_language_78 +
+           cps19_language_79 + cps19_language_80 + cps19_language_81 + cps19_language_82 +
+           cps19_language_83 + cps19_language_84) %>% 
+   mutate(mothertongue = ifelse(cps19_language_68 == 1 & num_language == 1, "English",
+                            ifelse(cps19_language_69 == 1 & num_language == 1, "French",
+                                   ifelse(num_language > 1, "Multiple", "Others")))) %>% 
+  mutate(vote = cps19_votechoice + cps19_vote_unlikely) %>% 
+  mutate(vote_conservative = ifelse(vote == 2, 1, 0))
+```
+
+
+```{r}
+# Clean up data
+# sex
+election <- election %>% mutate(sex = ifelse(cps19_gender == 1, "Male", "Female")) 
+
+# religion_importance
+election$cps19_rel_imp[election$cps19_rel_imp==5] <- 4
+election <- election %>% mutate(religion_importance = 
+                                  case_when(
+    cps19_rel_imp==1 ~ "Very important",
+    cps19_rel_imp==2 ~ "Somewhat important",
+    cps19_rel_imp==3 ~ "Not very important",
+    cps19_rel_imp==4 ~ "Not at all important"))
+  
+election <- election %>%   filter(is.na(election$religion_importance) == FALSE)
+
+# employment
+election <- election %>% mutate(employment = ifelse(cps19_employment %in% c(1,2,3), "Employed", "Unemployed"))
+
+# have_children
+election$cps19_children[election$cps19_children==3] <- 2
+election <- election %>% mutate(have_children = ifelse(cps19_children == 1, "Yes", "No"))
+
+# born_canada
+election$cps19_bornin_canada[election$cps19_bornin_canada==3] <- 2
+election <- election %>% mutate(born_canada = ifelse(cps19_bornin_canada == 1, "Yes", "No"))
+
+# household_size
+election$cps19_household[election$cps19_household >= 6] <- 6
+election <- election %>% filter(is.na(election$cps19_household)==FALSE) %>% 
+  mutate(household_size = case_when(
+    cps19_rel_imp==1 ~ "One person household",
+    cps19_rel_imp==2 ~ "Two person household",
+    cps19_rel_imp==3 ~ "Three person household",
+    cps19_rel_imp==4 ~ "Four or more person household"))
+   # cps19_rel_imp==5 ~ "Five person household",
+   # cps19_rel_imp==6 ~ "Six or more person household"))
+
+# province
+election <- election %>% mutate(province = case_when(
+    cps19_province==14 ~ "Alberta",
+    cps19_province==15 ~ "British Columbia",
+    cps19_province==16 ~ "Manitoba",
+    cps19_province==17 ~ "New Brunswick",
+    cps19_province==18 ~ "Newfoundland and Labrador",
+    cps19_province==19 ~ "Northwest Territories",
+    cps19_province==20 ~ "Nova Scotia",
+    cps19_province==21 ~ "Nunavut",
+    cps19_province==22 ~ "Ontario",
+    cps19_province==23 ~ "Prince Edward Island",
+    cps19_province==24 ~ "Quebec",
+    cps19_province==25 ~ "Saskatchewan",
+    cps19_province==26 ~ "Yukon"))
+
+# household_income filter NAs
+election <- election %>% 
+  mutate(household_income = ifelse(cps19_income_number < 25000, "Less than $25,000",
+                ifelse(cps19_income_number >= 25000 & cps19_income_number < 50000, "$25,000 to $49,999",
+                ifelse(cps19_income_number >= 50000 & cps19_income_number < 75000, "$50,000 to $74,999", 
+                ifelse(cps19_income_number >= 75000 & cps19_income_number < 100000, "$75,000 to $99,999",
+            ifelse(cps19_income_number >= 100000 & cps19_income_number < 125000, "$100,000 to $ 124,999", "$125,000 and more"))))))
+
+election <- election %>% filter(is.na(election$household_income)==FALSE) 
+
+# age
+election <- election %>% mutate(age = cps19_age)
+election <- election %>% mutate(age_group = ifelse(age >= 18 & age <= 30, "18-30",
+                                            ifelse(age > 30 & age <= 55, "30-55",
+                                            ifelse(age > 55 & age <= 70, "55-70", "Above 70"))))
+# marital
+election <- election %>% mutate(marital = ifelse(cps19_marital %in% c(1,4), "Married", "Not Married"))
+
+# education
+election <- election %>% mutate(education = ifelse(cps19_education %in% c(7,8,9,10,11), "More than highschool diploma", "Less than highschool diploma or equivalent"))
+
+```
+
+```{r, warning=FALSE}
+# Select column after cleaning up
+election <- election %>% 
+  select(vote_conservative,
+         sex,
+         religion_importance,
+         employment,
+         have_children,
+         born_canada,
+         household_size,
+         province,
+         household_income,
+         age_group,
+         marital,
+         education,
+         mothertongue)
+# Export data
+write_csv(election, "election.csv")
+```
+
